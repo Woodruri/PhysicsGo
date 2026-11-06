@@ -5,17 +5,23 @@ import (
 	"image/color"
 	"os"
 	"time"
+	"math/rand"
 )
 
 const (
 	// PHYSICS
 	DEFAULT_DRAG float64 = 0.1
-	GRAVITY float64 = 9.8
-	BOUNCE_COEFFICIENT float64 = .8
+	GRAVITY float64 = 98
+	BOUNCE_COEFFICIENT float64 = .95
+	BOUNCE_DIR_COEFFICIENT float64 = 15
 
 	// SCREEN
-	SCREEN_WIDTH  = 480
-	SCREEN_HEIGHT = 320 
+	SCREEN_WIDTH  = 1080
+	SCREEN_HEIGHT = 720 
+
+	// OTHER
+	FRAMERATE = 60.0
+	TOTAL_RUNS = 10000
 )
 
 /******************************************************************
@@ -65,6 +71,26 @@ func (body *Body) Update(dt float64) {
 	body.Acc.Y = 0
 }
 
+// Handles collisions on borders
+func (circ *Circle) Bounce(dt float64) {
+	randomBool := rand.Intn(2) == 1
+
+	if circ.Bod.Pos.Y >= float64(SCREEN_HEIGHT) - circ.Radius {
+		circ.Bod.Pos.Y = float64(SCREEN_HEIGHT) - circ.Radius
+		circ.Bod.Vel.Y = -circ.Bod.Vel.Y * BOUNCE_COEFFICIENT
+		if randomBool {
+			circ.Bod.Vel.X += rand.NormFloat64() * (BOUNCE_COEFFICIENT * -1)
+		} else {
+			circ.Bod.Vel.X += rand.NormFloat64() * BOUNCE_COEFFICIENT
+		}
+	}
+	if circ.Bod.Pos.X <= 0 + circ.Radius || 
+	circ.Bod.Pos.X >= float64(SCREEN_WIDTH) - circ.Radius {
+
+		circ.Bod.Vel.X = -circ.Bod.Vel.X * BOUNCE_COEFFICIENT
+	}
+}
+
 /******************************************************************
 
 DRAWING FUNCS
@@ -72,8 +98,8 @@ DRAWING FUNCS
 ******************************************************************/
 
 func drawCircle(img *image.RGBA, circle *Circle) {
-	for y := int(circle.Bod.Pos.Y) - int(circle.Radius) ; y <= int(circle.Bod.Pos.Y) ; y++ {
-		for x := int(circle.Bod.Pos.X) - int(circle.Radius) ; x <= int(circle.Bod.Pos.X) ; x++ {
+	for y := int(circle.Bod.Pos.Y - circle.Radius) ; y <= int(circle.Bod.Pos.Y + circle.Radius) ; y++ {
+		for x := int(circle.Bod.Pos.X - circle.Radius) ; x <= int(circle.Bod.Pos.X + circle.Radius) ; x++ {
 			if x >= 0 && x < SCREEN_WIDTH && y >= 0 && y < SCREEN_HEIGHT {
 				dx := x - int(circle.Bod.Pos.X)
 				dy := y - int(circle.Bod.Pos.Y)
@@ -103,13 +129,13 @@ MAIN
 func main() {
 	//Setup
 	// Canvas
-	canvas := image.NewRGBA(image.Rect(0, 0, SCREEN_HEIGHT, SCREEN_HEIGHT))
+	canvas := image.NewRGBA(image.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
 	// the BALL
 	ball := &Circle{
 		Bod: Body{
-			Pos: Vector2{X: 20, Y: 20},
-			Vel: Vector2{X: 5, Y: 5},
+			Pos: Vector2{X: 100, Y: 100},
+			Vel: Vector2{X: 500, Y: 2},
 			Acc: Vector2{X: 0, Y: 0},
 			Restitution: 10,
 			Mass: 5,
@@ -119,23 +145,18 @@ func main() {
 	}
 	
 	// Time
-	var dt float64 = 1.0 / 60.0
+	var dt float64 = 1.0 / float64(FRAMERATE)
+	targetFrameTime := time.Second / FRAMERATE
 	
 	//Main loop
 	for {
-		
 		startTime := time.Now()
 		
 		//Physics Update
-		// Gravity
-		ball.Bod.Vel.Y += GRAVITY * dt
-		ball.Bod.Vel.X += GRAVITY * dt
-
-		// Floor Bounce
-		if ball.Bod.Pos.Y >= float64(SCREEN_HEIGHT) - ball.Radius {
-			ball.Bod.Pos.Y = float64(SCREEN_HEIGHT) - ball.Radius
-			ball.Bod.Vel.Y = -ball.Bod.Vel.Y * BOUNCE_COEFFICIENT
-		}
+		// Gravity and Floor Bounce
+		ball.Bod.ApplyForce(Vector2{X: 0, Y: GRAVITY * ball.Bod.Mass * 10})
+		ball.Bod.Update(dt)
+		ball.Bounce(dt)
 
 		//Rendering
 		// Clear canvas
@@ -146,10 +167,12 @@ func main() {
 		
 		// Pipe to window
 		os.Stdout.Write(canvas.Pix)
+		os.Stdout.Sync()
 
-		// Wait 1/60 sec
+		// Wait framerate
 		elapsedTime := time.Since(startTime)
-		time.Sleep((time.Second / 60.0) - elapsedTime)
+		if elapsedTime < targetFrameTime {
+			time.Sleep(targetFrameTime - elapsedTime)
+		}
 	}
-
 }
