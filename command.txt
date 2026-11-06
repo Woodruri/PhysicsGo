@@ -1,0 +1,1 @@
+go run physics.go | ffplay -f rawvideo -pixel_format rgba -video_size 320x240 -i -
