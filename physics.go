@@ -86,8 +86,13 @@ func (circ *Circle) Bounce(dt float64) {
 	}
 	if circ.Bod.Pos.X <= 0 + circ.Radius || 
 	circ.Bod.Pos.X >= float64(SCREEN_WIDTH) - circ.Radius {
-
 		circ.Bod.Vel.X = -circ.Bod.Vel.X * BOUNCE_COEFFICIENT
+
+		if circ.Bod.Pos.X >= float64(SCREEN_WIDTH) - circ.Radius {
+			circ.Bod.Pos.X = float64(SCREEN_WIDTH) - circ.Radius
+		} else if circ.Bod.Pos.X <= 0 + circ.Radius {
+			circ.Bod.Pos.X = 0 + circ.Radius
+		}
 	}
 }
 
@@ -135,7 +140,7 @@ func main() {
 	ball := &Circle{
 		Bod: Body{
 			Pos: Vector2{X: 100, Y: 100},
-			Vel: Vector2{X: 500, Y: 2},
+			Vel: Vector2{X: 900, Y: 200},
 			Acc: Vector2{X: 0, Y: 0},
 			Restitution: 10,
 			Mass: 5,
