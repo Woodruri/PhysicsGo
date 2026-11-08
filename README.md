@@ -24,20 +24,3 @@ The program opens a 1080×720 window and runs at 60 FPS.
 | Space         | Jump (adds upward velocity)       |
 | Mouse wheel   | Zoom (the camera orbits on its own) |
 | Esc           | Quit                              |
-
-## How it works
-
-Everything lives in [physics.go](physics.go):
-
-- **`Ball.Update(dt)`** applies gravity to the Y velocity, moves the ball by `velocity × dt`, and then checks the walls. When the ball goes past a wall on any axis, it is clamped back inside and that velocity component is reversed and scaled down by `BOUNCE`.
-- **`main`** sets up the window and an orbiting camera, then runs a loop each frame: input, physics step, render.
-
-Y points up. Positions and velocities are in meters and m/s.
-
-### Tunable constants
-
-| Constant  | Default | Meaning                                         |
-|-----------|---------|-------------------------------------------------|
-| `GRAVITY` | `9.8`   | Downward acceleration (m/s²)                    |
-| `BOUNCE`  | `0.9`   | Fraction of speed kept after hitting a wall     |
-| `HALF`    | `5.0`   | Half the width of the box (the box is `2*HALF` per side) |
