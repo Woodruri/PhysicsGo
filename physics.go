@@ -1,183 +1,100 @@
 package main
 
-import (
-	"image"
-	"image/color"
-	"os"
-	"time"
-	"math/rand"
-)
+import rl "github.com/gen2brain/raylib-go/raylib"
 
 const (
 	// PHYSICS
-	DEFAULT_DRAG float64 = 0.1
-	GRAVITY float64 = 98
-	BOUNCE_COEFFICIENT float64 = .95
-	BOUNCE_DIR_COEFFICIENT float64 = 15
+	GRAVITY = 9.8
+	BOUNCE  = 0.9
 
-	// SCREEN
-	SCREEN_WIDTH  = 1080
-	SCREEN_HEIGHT = 720 
-
-	// OTHER
-	FRAMERATE = 60.0
-	TOTAL_RUNS = 10000
+	// WORLD
+	HALF    = 5.0 // half the size of the box
 )
 
 /******************************************************************
-
 STRUCTS
-
 ******************************************************************/
 
-
-type Vector2 struct {
-	X, Y float64
-}
-
-type Body struct {
-	Pos 		Vector2
-	Vel 		Vector2
-	Acc 		Vector2
-	Mass 		float64
-	Restitution float64 // bounciness
-}
-
-type Circle struct {
-	Bod         Body
-	Radius 		float64
-	Clr 		color.RGBA
+type Ball struct {
+	Pos, Vel rl.Vector3
+	Radius   float32
 }
 
 /******************************************************************
-
 PHYSICS FUNCS
-
 ******************************************************************/
 
-func (body *Body) ApplyForce(force Vector2) {
-	body.Acc.X += force.X / body.Mass
-	body.Acc.Y += force.Y / body.Mass
-}
+func (b *Ball) Update(dt float32) {
+	b.Vel.Y -= GRAVITY * dt
+	b.Pos = rl.Vector3Add(b.Pos, rl.Vector3Scale(b.Vel, dt))
 
-func (body *Body) Update(dt float64) {
-	body.Vel.X += body.Acc.X * dt
-	body.Vel.Y += body.Acc.Y * dt
-
-	body.Pos.X += body.Vel.X * dt
-	body.Pos.Y += body.Vel.Y * dt
-
-	body.Acc.X = 0
-	body.Acc.Y = 0
-}
-
-// Handles collisions on borders
-func (circ *Circle) Bounce(dt float64) {
-	randomBool := rand.Intn(2) == 1
-
-	if circ.Bod.Pos.Y >= float64(SCREEN_HEIGHT) - circ.Radius {
-		circ.Bod.Pos.Y = float64(SCREEN_HEIGHT) - circ.Radius
-		circ.Bod.Vel.Y = -circ.Bod.Vel.Y * BOUNCE_COEFFICIENT
-		if randomBool {
-			circ.Bod.Vel.X += rand.NormFloat64() * (BOUNCE_COEFFICIENT * -1)
-		} else {
-			circ.Bod.Vel.X += rand.NormFloat64() * BOUNCE_COEFFICIENT
-		}
+	// Handles collisions on walls
+	bounce := func(p, v *float32) {
+		lim := HALF - b.Radius
+		if *p > lim  { *p = lim;  *v = -*v * BOUNCE }
+		if *p < -lim { *p = -lim; *v = -*v * BOUNCE }
 	}
-	if circ.Bod.Pos.X <= 0 + circ.Radius || 
-	circ.Bod.Pos.X >= float64(SCREEN_WIDTH) - circ.Radius {
-		circ.Bod.Vel.X = -circ.Bod.Vel.X * BOUNCE_COEFFICIENT
-
-		if circ.Bod.Pos.X >= float64(SCREEN_WIDTH) - circ.Radius {
-			circ.Bod.Pos.X = float64(SCREEN_WIDTH) - circ.Radius
-		} else if circ.Bod.Pos.X <= 0 + circ.Radius {
-			circ.Bod.Pos.X = 0 + circ.Radius
-		}
-	}
+	bounce(&b.Pos.X, &b.Vel.X)
+	bounce(&b.Pos.Y, &b.Vel.Y)
+	bounce(&b.Pos.Z, &b.Vel.Z)
 }
 
 /******************************************************************
-
-DRAWING FUNCS
-
-******************************************************************/
-
-func drawCircle(img *image.RGBA, circle *Circle) {
-	for y := int(circle.Bod.Pos.Y - circle.Radius) ; y <= int(circle.Bod.Pos.Y + circle.Radius) ; y++ {
-		for x := int(circle.Bod.Pos.X - circle.Radius) ; x <= int(circle.Bod.Pos.X + circle.Radius) ; x++ {
-			if x >= 0 && x < SCREEN_WIDTH && y >= 0 && y < SCREEN_HEIGHT {
-				dx := x - int(circle.Bod.Pos.X)
-				dy := y - int(circle.Bod.Pos.Y)
-				if (dx*dx) + (dy*dy) <= int(circle.Radius * circle.Radius) {
-					img.SetRGBA(int(x), int(y), circle.Clr)
-				}
-			}
-		}
-	}
-}
-
-func clearCanvas(img *image.RGBA) {
-	for i := 0 ; i < len(img.Pix); i += 4 {
-		img.Pix[i]   = 0   // R
-		img.Pix[i+1] = 0   // G
-		img.Pix[i+2] = 0   // B
-		img.Pix[i+3] = 255 // A
-	}
-}
-
-/******************************************************************
-
 MAIN
-
 ******************************************************************/
 
 func main() {
 	//Setup
-	// Canvas
-	canvas := image.NewRGBA(image.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+	// Window
+	rl.InitWindow(1080, 720, "PhysicsGo 3D")
+	defer rl.CloseWindow()
+	rl.SetTargetFPS(60)
+
+	// Camera
+	cam := rl.Camera3D{
+		Position:   rl.NewVector3(12, 8, 12),
+		Target:     rl.NewVector3(0, 0, 0),
+		Up:         rl.NewVector3(0, 1, 0),
+		Fovy:       45,
+		Projection: rl.CameraPerspective,
+	}
 
 	// the BALL
-	ball := &Circle{
-		Bod: Body{
-			Pos: Vector2{X: 100, Y: 100},
-			Vel: Vector2{X: 900, Y: 200},
-			Acc: Vector2{X: 0, Y: 0},
-			Restitution: 10,
-			Mass: 5,
-		},
-		Radius: 30,
-		Clr: color.RGBA{100, 100, 255, 250},
-	}
-	
-	// Time
-	var dt float64 = 1.0 / float64(FRAMERATE)
-	targetFrameTime := time.Second / FRAMERATE
-	
+	ball := &Ball{Pos: rl.NewVector3(0, 3, 0), Vel: rl.NewVector3(6, 0, 3), Radius: 0.5}
+
 	//Main loop
-	for {
-		startTime := time.Now()
-		
+	for !rl.WindowShouldClose() {
+		dt := rl.GetFrameTime()
+
+		//Input
+		// Camera
+		rl.UpdateCamera(&cam, rl.CameraOrbital)
+
+		// Jump
+		if rl.IsKeyPressed(rl.KeySpace) { ball.Vel.Y += 8 }
+
+		// Push ball
+		if rl.IsKeyDown(rl.KeyLeft)     { ball.Vel.X -= 10 * dt }
+		if rl.IsKeyDown(rl.KeyRight)    { ball.Vel.X += 10 * dt }
+		if rl.IsKeyDown(rl.KeyUp)       { ball.Vel.Z -= 10 * dt }
+		if rl.IsKeyDown(rl.KeyDown)     { ball.Vel.Z += 10 * dt }
+
 		//Physics Update
-		// Gravity and Floor Bounce
-		ball.Bod.ApplyForce(Vector2{X: 0, Y: GRAVITY * ball.Bod.Mass * 10})
-		ball.Bod.Update(dt)
-		ball.Bounce(dt)
+		ball.Update(dt)
 
 		//Rendering
-		// Clear canvas
-		clearCanvas(canvas)
+		rl.BeginDrawing()
+		rl.ClearBackground(rl.Black)
+		rl.BeginMode3D(cam)
+
+		// Draw Box
+		rl.DrawCubeWires(rl.NewVector3(0, 0, 0), 2*HALF, 2*HALF, 2*HALF, rl.Gray)
 
 		// Draw Ball
-		drawCircle(canvas, ball)
-		
-		// Pipe to window
-		os.Stdout.Write(canvas.Pix)
-		os.Stdout.Sync()
+		rl.DrawSphere(ball.Pos, ball.Radius, rl.NewColor(100, 100, 255, 255))
 
-		// Wait framerate
-		elapsedTime := time.Since(startTime)
-		if elapsedTime < targetFrameTime {
-			time.Sleep(targetFrameTime - elapsedTime)
-		}
+		rl.EndMode3D()
+		rl.DrawFPS(10, 10)
+		rl.EndDrawing()
 	}
 }
